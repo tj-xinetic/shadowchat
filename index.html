@@ -1,1 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Krosynd // Shadow-Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <style>
+        :root { --neon-blue: #00f2ff; --stark-black: #0a0a0a; --gray: #1a1a1a; }
+        body { background: var(--stark-black); color: var(--neon-blue); font-family: 'Courier New', monospace; margin: 0; overflow: hidden; }
+        #header { border-bottom: 2px solid var(--neon-blue); padding: 10px; font-weight: bold; letter-spacing: 2px; }
+        #chat-box { height: 75vh; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; }
+        .msg { margin-bottom: 10px; border-left: 2px solid var(--neon-blue); padding-left: 10px; animation: flicker 0.2s ease-in; }
+        .user { font-weight: bold; color: #fff; font-size: 0.8em; }
+        #input-area { position: fixed; bottom: 0; width: 100%; background: var(--gray); display: flex; }
+        input { background: none; border: none; color: var(--neon-blue); padding: 20px; flex-grow: 1; outline: none; }
+        @keyframes flicker { 0% { opacity: 0; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
 
+<div id="header">TJ-XINETIC // SECURE TERMINAL</div>
+<div id="chat-box"></div>
+
+<div id="input-area">
+    <input type="text" id="username" placeholder="CALLSIGN..." style="width: 20%; border-right: 1px solid var(--neon-blue);">
+    <input type="text" id="message" placeholder="ENTER INTEL...">
+</div>
+
+<script>
+    // Initialize Gun.js with public relay peers
+    const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
+    const chat = gun.get('krosynd_shadow_sector_01');
+
+    const chatBox = document.getElementById('chat-box');
+    const msgInput = document.getElementById('message');
+    const userInput = document.getElementById('username');
+
+    // Protocol: Auto-purge messages older than 4 hours
+    const EXPIRY_MS = 4 * 60 * 60 * 1000; 
+
+    // Sending Intel
+    msgInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && msgInput.value && userInput.value) {
+            chat.set({
+                user: userInput.value,
+                body: msgInput.value,
+                time: Date.now()
+            });
+            msgInput.value = '';
+        }
+    });
+
+    // Receiving & Filtering Intel
+    chat.map().once((data, id) => {
+        if (data && data.time > (Date.now() - EXPIRY_MS)) {
+            const div = document.createElement('div');
+            div.classList.add('msg');
+            div.innerHTML = `<span class="user">[${data.user}]</span>: ${data.body}`;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    });
+</script>
+</body>
+</html>
