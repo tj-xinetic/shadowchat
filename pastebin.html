@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>KROSYND // SYNC-BIN</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        :root { --neon: #00ff66; /* Shifted to Neon Green for distinction */ --bg: #050505; --panel: #121212; --hazard: #ff4444; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html { background: var(--bg); color: var(--neon); font-family: 'Consolas', monospace; margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+        
+        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; }
+        
+        #header { height: 40px; border-bottom: 1px solid #333; padding: 0 15px; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; background: #000; letter-spacing: 1px; }
+        
+        .blink { animation: blinker 1s step-end infinite; color: var(--neon); }
+        @keyframes blinker { 50% { opacity: 0; } }
+        
+        #workspace { flex: 1; padding: 15px; display: flex; flex-direction: column; }
+        
+        textarea { 
+            flex: 1; 
+            background: rgba(0, 255, 102, 0.02); 
+            border: 1px solid #333; 
+            border-left: 2px solid var(--neon); 
+            color: #ddd; 
+            font-family: 'Consolas', monospace; 
+            font-size: 16px; /* Mobile safe */
+            padding: 15px; 
+            resize: none; 
+            outline: none; 
+        }
+        
+        textarea:focus { border-color: var(--neon); background: rgba(0, 255, 102, 0.05); }
+
+        #controls { height: 60px; background: var(--panel); display: flex; border-top: 1px solid #333; width: 100%; }
+        
+        .btn { flex: 1; background: none; border: none; border-right: 1px solid #333; color: var(--neon); font-size: 0.75rem; font-family: 'Consolas', monospace; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: 0.2s; }
+        .btn:hover { background: rgba(0, 255, 102, 0.1); }
+        .btn:active { background: var(--neon); color: #000; }
+        
+        .btn-hazard { color: var(--hazard); border-right: none; }
+        .btn-hazard:hover { background: rgba(255, 68, 68, 0.1); }
+        .btn-hazard:active { background: var(--hazard); color: #000; }
+    </style>
+</head>
+<body>
+
+<div id="viewport">
+    <div id="header">
+        <span>KROSYND // SYNC-BIN<span class="blink">_</span></span>
+        <span id="status" style="color: #555; font-size: 0.65rem;">IDLE</span>
+    </div>
+    
+    <div id="workspace">
+        <textarea id="clipboard" placeholder="Awaiting payload..."></textarea>
+    </div>
+
+    <div id="controls">
+        <button class="btn" onclick="pushToCloud()">[ UPLOAD ]</button>
+        <button class="btn" onclick="copyToDevice()">[ COPY TO DEVICE ]</button>
+        <button class="btn btn-hazard" onclick="scrubBuffer()">[ SCRUB ]</button>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDyTYDmpmsXkFjU8W8VbCU94A2p9XIJ6CE",
+        authDomain: "krosynd-core.firebaseapp.com",
+        databaseURL: "https://krosynd-core-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "krosynd-core",
+        storageBucket: "krosynd-core.firebasestorage.app",
+        messagingSenderId: "395064207136",
+        appId: "1:395064207136:web:1f62a94c732e2dc4c71945"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    
+    // Target the new clipboard node
+    const clipRef = db.ref('krosynd_clipboard/payload');
+    const textArea = document.getElementById('clipboard');
+    const statusText = document.getElementById('status');
+
+    // Viewport fix for mobile keyboards
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            document.getElementById('viewport').style.height = window.visualViewport.height + 'px';
+        });
+    }
+
+    // 1. LISTEN TO CLOUD: Updates local text area when cloud changes
+    clipRef.on('value', (snapshot) => {
+        if (snapshot.exists()) {
+            textArea.value = snapshot.val();
+            flashStatus("SYNCED FROM CLOUD");
+        } else {
+            textArea.value = '';
+            flashStatus("BUFFER EMPTY");
+        }
+    });
+
+    // 2. PUSH TO CLOUD: Manual trigger to upload local text
+    window.pushToCloud = function() {
+        const payload = textArea.value;
+        clipRef.set(payload).then(() => {
+            flashStatus("UPLOAD COMPLETE");
+        }).catch(err => {
+            flashStatus("UPLOAD FAILED");
+            console.error(err);
+        });
+    };
+
+    // 3. COPY TO DEVICE: Uses browser clipboard API
+    window.copyToDevice = function() {
+        textArea.select();
+        navigator.clipboard.writeText(textArea.value).then(() => {
+            flashStatus("COPIED TO LOCAL MEMORY");
+        }).catch(err => {
+            flashStatus("CLIPBOARD PERMISSION DENIED");
+        });
+    };
+
+    // 4. SCRUB: Nullify the node
+    window.scrubBuffer = function() {
+        if (confirm("ERASE CLOUD BUFFER?")) {
+            clipRef.remove().then(() => flashStatus("BUFFER SCRUBBED"));
+        }
+    };
+
+    function flashStatus(msg) {
+        statusText.innerText = msg;
+        statusText.style.color = "var(--neon)";
+        setTimeout(() => {
+            statusText.innerText = "IDLE";
+            statusText.style.color = "#555";
+        }, 2000);
+    }
+</script>
+</body>
+</html>
