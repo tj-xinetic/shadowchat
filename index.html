@@ -3,143 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Krosynd // Shadow-Chat V6</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gun/0.2020.1235/gun.min.js"></script>
+    <title>KROSYND // SECURE-LINK</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <style>
-        :root { --neon-blue: #00f2ff; --black: #050505; --gray: #121212; --hazard: #ff4444; }
-        
+        :root { --neon: #00f2ff; --bg: #050505; --panel: #121212; --hazard: #ff4444; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body, html { background: var(--bg); color: var(--neon); font-family: 'Consolas', monospace; margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
         
-        body, html { 
-            background: var(--black); color: var(--neon-blue); 
-            font-family: 'Consolas', 'Courier New', monospace; 
-            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
-        }
-
-        #viewport {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column;
-        }
-
-        #header { 
-            height: 40px; border-bottom: 1px solid #222; padding: 0 15px; 
-            display: flex; justify-content: space-between; align-items: center; font-size: 0.65rem; background: var(--black);
-        }
-
-        /* Fixed Chat Area */
-        #chat-box { 
-            flex: 1; overflow-y: auto; padding: 15px; 
-            display: flex; flex-direction: column-reverse; gap: 10px;
-        }
-
-        .msg { font-size: 0.9rem; border-left: 2px solid var(--neon-blue); padding: 5px 12px; background: rgba(255,255,255,0.03); max-width: 85%; }
-        .cs-tag { font-weight: bold; color: #666; font-size: 0.7rem; display: block; text-transform: uppercase; }
+        #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; }
         
-        /* Floating Input Area - Locked Dimensions */
-        #input-area { 
-            height: 60px; background: var(--gray); display: flex; border-top: 1px solid #333; width: 100%;
-        }
+        #header { height: 40px; border-bottom: 1px solid #333; padding: 0 15px; display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; background: #000; }
         
-        #callsign { 
-            width: 70px; /* FIXED WIDTH */
-            border: none; border-right: 1px solid #333; background: #000; 
-            color: #fff; text-align: center; outline: none; font-size: 0.7rem;
-        }
-
-        #message { 
-            flex: 1; background: none; border: none; color: var(--neon-blue); 
-            padding: 0 15px; outline: none; font-size: 16px;
-        }
-
-        #purge-btn { background: none; border: 1px solid var(--hazard); color: var(--hazard); padding: 2px 8px; font-size: 0.6rem; cursor: pointer; }
+        #chat-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column-reverse; gap: 8px; }
+        .msg { font-size: 0.95rem; border-left: 2px solid var(--neon); padding: 5px 10px; background: rgba(0,242,255,0.05); max-width: 90%; word-wrap: break-word; }
+        .cs-tag { font-weight: bold; color: #777; font-size: 0.75rem; display: block; margin-bottom: 2px; }
+        
+        #input-area { height: 60px; background: var(--panel); display: flex; border-top: 1px solid #333; width: 100%; }
+        #callsign { width: 75px; border: none; border-right: 1px solid #333; background: #000; color: #fff; text-align: center; outline: none; font-size: 0.8rem; text-transform: uppercase; }
+        #message { flex: 1; background: none; border: none; color: var(--neon); padding: 0 15px; outline: none; font-size: 16px; }
+        
+        #purge-btn { background: none; border: 1px solid var(--hazard); color: var(--hazard); padding: 2px 8px; font-size: 0.65rem; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div id="viewport">
     <div id="header">
-        <span>KROSYND // V6_STABLE</span>
-        <button id="purge-btn" onclick="hardPurge()">[ RESET ]</button>
+        <span>KROSYND // LINK_ACTIVE</span>
+        <button id="purge-btn" onclick="executePurge()">[ PURGE ]</button>
     </div>
-
     <div id="chat-box"></div>
-
     <div id="input-area">
-        <input type="text" id="callsign" placeholder="CS" maxlength="5">
-        <input type="text" id="message" placeholder="Input signal..." autocomplete="off">
+        <input type="text" id="callsign" placeholder="CS" maxlength="6">
+        <input type="text" id="message" placeholder="Transmit..." autocomplete="off">
     </div>
 </div>
 
 <script>
-    // Using explicit relay peers for better cross-device handshaking
-    const peers = [
-        'https://gun-manhattan.herokuapp.com/gun',
-        'https://peer.wall.org/gun',
-        'https://gunjs.herokuapp.com/gun'
-    ];
-    const gun = Gun({ peers: peers, localStorage: false }); // Disable local storage to ensure fresh sync
+    // ==========================================
+    // KROSYND CORE - FIREBASE CONFIGURATION
+    // ==========================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDyTYDmpmsXkFjU8W8VbCU94A2p9XIJ6CE",
+        authDomain: "krosynd-core.firebaseapp.com",
+        databaseURL: "https://krosynd-core-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "krosynd-core",
+        storageBucket: "krosynd-core.firebasestorage.app",
+        messagingSenderId: "395064207136",
+        appId: "1:395064207136:web:1f62a94c732e2dc4c71945"
+    };
 
-    // Purge logic using a dynamic key. If purged, we change the room ID.
-    let roomKey = localStorage.getItem('krosynd_room_v6') || 'sector_alpha_01';
-    let sector = gun.get(roomKey);
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    
+    // Target the specific comms sector defined in your security rules
+    const chatRef = db.ref('krosynd_secure_comms');
 
     const chatBox = document.getElementById('chat-box');
     const msgInput = document.getElementById('message');
     const csInput = document.getElementById('callsign');
-    const viewport = document.getElementById('viewport');
+    
+    // 4 Hours in Milliseconds for volatile memory
+    const EXPIRY_MS = 4 * 60 * 60 * 1000; 
 
-    // Mobile Viewport Keyboard Correction
+    // iOS/Android Floating Keyboard Fix
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
-            viewport.style.height = window.visualViewport.height + 'px';
-            viewport.style.top = window.visualViewport.offsetTop + 'px';
+            document.getElementById('viewport').style.height = window.visualViewport.height + 'px';
         });
     }
 
-    // Sync Handler
-    function startListen() {
-        sector.map().on((data, id) => {
-            if (!data || !data.user) return;
-            if (data.time > (Date.now() - 14400000)) { // 4 Hour Window
-                if (!document.getElementById(id)) {
-                    const div = document.createElement('div');
-                    div.id = id;
-                    div.className = 'msg';
-                    div.innerHTML = `<span class="cs-tag">${data.user}</span>${data.body}`;
-                    chatBox.prepend(div);
-                }
-            }
-        });
-    }
-    startListen();
+    // Pull current data (limited to 4 hours)
+    const cutoffTime = Date.now() - EXPIRY_MS;
+    chatRef.orderByChild('timestamp').startAt(cutoffTime).on('child_added', (snapshot) => {
+        const data = snapshot.val();
+        const div = document.createElement('div');
+        div.className = 'msg';
+        div.innerHTML = `<span class="cs-tag">${data.user}</span> ${data.text}`;
+        chatBox.prepend(div);
+    });
 
-    // Transmission Logic
+    // Listen for purge protocol
+    chatRef.on('value', (snapshot) => {
+        if (!snapshot.exists()) {
+            chatBox.innerHTML = ''; 
+        }
+    });
+
+    // Transmit function
     msgInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && msgInput.value && csInput.value) {
-            sector.set({
+        if (e.key === 'Enter' && msgInput.value.trim() && csInput.value.trim()) {
+            chatRef.push({
                 user: csInput.value.toUpperCase(),
-                body: msgInput.value,
-                time: Date.now()
+                text: msgInput.value.trim(),
+                timestamp: firebase.database.ServerValue.TIMESTAMP
             });
             msgInput.value = '';
         }
     });
 
-    // Hard Purge: Generates a new unique room key and reloads
-    function hardPurge() {
-        if (prompt("ENTER PURGE CODE:") === "purge123") {
-            const newKey = 'sector_' + Math.random().toString(36).substr(2, 9);
-            // Inform others on the current channel to switch or clear
-            sector.put({purged: true, time: Date.now()}); 
-            localStorage.setItem('krosynd_room_v6', newKey);
-            alert("SECTOR ZEROED. REBOOTING...");
-            location.reload();
+    // Scrub function
+    function executePurge() {
+        if (prompt("ENTER PURGE AUTHORIZATION:") === "purge123") {
+            chatRef.remove()
+                .then(() => alert("DATABASE WIPED."))
+                .catch((err) => alert("ERROR: " + err.message));
         }
     }
-
-    // Watch for purge signal from other devices
-    sector.get('purged').on(v => { if(v) location.reload(); });
-
 </script>
 </body>
 </html>
