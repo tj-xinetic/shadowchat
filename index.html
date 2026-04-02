@@ -15,37 +15,42 @@
         
         #viewport { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; }
         
-        #header { height: 40px; border-bottom: 1px solid #333; padding: 0 15px; display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; background: #000; }
+        #header { height: 40px; border-bottom: 1px solid #333; padding: 0 15px; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; background: #000; letter-spacing: 1px; }
+        
+        .blink { animation: blinker 1s step-end infinite; color: var(--neon); }
+        @keyframes blinker { 50% { opacity: 0; } }
         
         #chat-box { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column-reverse; gap: 8px; }
-        .msg { font-size: 0.95rem; border-left: 2px solid var(--neon); padding: 5px 10px; background: rgba(0,242,255,0.05); max-width: 90%; word-wrap: break-word; }
-        .cs-tag { font-weight: bold; color: #777; font-size: 0.75rem; display: block; margin-bottom: 2px; }
+        
+        /* Base message style. Border color will be overridden by JS */
+        .msg { font-size: 0.95rem; border-left: 2px solid var(--neon); padding: 5px 10px; background: rgba(255,255,255,0.03); max-width: 90%; word-wrap: break-word; }
+        
+        /* Base tag style. Text color will be overridden by JS */
+        .cs-tag { font-weight: bold; font-size: 0.75rem; display: block; margin-bottom: 2px; text-shadow: 0 0 5px rgba(0,0,0,0.8); }
         
         #input-area { height: 60px; background: var(--panel); display: flex; border-top: 1px solid #333; width: 100%; }
-        #callsign { width: 75px; border: none; border-right: 1px solid #333; background: #000; color: #fff; text-align: center; outline: none; font-size: 0.8rem; text-transform: uppercase; }
+        #callsign { width: 110px; border: none; border-right: 1px solid #333; background: #000; color: #fff; text-align: center; outline: none; font-size: 0.8rem; text-transform: uppercase; }
         #message { flex: 1; background: none; border: none; color: var(--neon); padding: 0 15px; outline: none; font-size: 16px; }
         
-        #purge-btn { background: none; border: 1px solid var(--hazard); color: var(--hazard); padding: 2px 8px; font-size: 0.65rem; cursor: pointer; }
+        #purge-btn { background: none; border: 1px solid var(--hazard); color: var(--hazard); padding: 2px 8px; font-size: 0.65rem; cursor: pointer; letter-spacing: 1px; }
+        #purge-btn:hover { background: var(--hazard); color: #000; }
     </style>
 </head>
 <body>
 
 <div id="viewport">
     <div id="header">
-        <span>KROSYND // LINK_ACTIVE</span>
+        <span>KROSYND // SECURE TRANSMISSION<span class="blink">_</span></span>
         <button id="purge-btn" onclick="executePurge()">[ PURGE ]</button>
     </div>
     <div id="chat-box"></div>
     <div id="input-area">
-        <input type="text" id="callsign" placeholder="CS" maxlength="6">
+        <input type="text" id="callsign" placeholder="CALL SIGN" maxlength="10">
         <input type="text" id="message" placeholder="Transmit..." autocomplete="off">
     </div>
 </div>
 
 <script>
-    // ==========================================
-    // KROSYND CORE - FIREBASE CONFIGURATION
-    // ==========================================
     const firebaseConfig = {
         apiKey: "AIzaSyDyTYDmpmsXkFjU8W8VbCU94A2p9XIJ6CE",
         authDomain: "krosynd-core.firebaseapp.com",
@@ -56,45 +61,52 @@
         appId: "1:395064207136:web:1f62a94c732e2dc4c71945"
     };
 
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    
-    // Target the specific comms sector defined in your security rules
     const chatRef = db.ref('krosynd_secure_comms');
 
     const chatBox = document.getElementById('chat-box');
     const msgInput = document.getElementById('message');
     const csInput = document.getElementById('callsign');
-    
-    // 4 Hours in Milliseconds for volatile memory
     const EXPIRY_MS = 4 * 60 * 60 * 1000; 
 
-    // iOS/Android Floating Keyboard Fix
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
             document.getElementById('viewport').style.height = window.visualViewport.height + 'px';
         });
     }
 
-    // Pull current data (limited to 4 hours)
+    // TACTICAL STRING HASH ALGORITHM
+    function getCSColor(cs) {
+        let hash = 0;
+        for (let i = 0; i < cs.length; i++) {
+            hash = cs.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        // Force Hue between 0-360. Saturation 100%, Lightness 65% for Neon effect.
+        const hue = Math.abs(hash % 360);
+        return `hsl(${hue}, 100%, 65%)`;
+    }
+
     const cutoffTime = Date.now() - EXPIRY_MS;
     chatRef.orderByChild('timestamp').startAt(cutoffTime).on('child_added', (snapshot) => {
         const data = snapshot.val();
         const div = document.createElement('div');
         div.className = 'msg';
-        div.innerHTML = `<span class="cs-tag">${data.user}</span> ${data.text}`;
+        
+        // Apply dynamic color to the message border and the Callsign text
+        const operatorColor = getCSColor(data.user);
+        div.style.borderLeftColor = operatorColor;
+        div.innerHTML = `<span class="cs-tag" style="color: ${operatorColor};">${data.user}</span> <span style="color: #ddd;">${data.text}</span>`;
+        
         chatBox.prepend(div);
     });
 
-    // Listen for purge protocol
     chatRef.on('value', (snapshot) => {
         if (!snapshot.exists()) {
             chatBox.innerHTML = ''; 
         }
     });
 
-    // Transmit function
     msgInput.addEventListener('keydown', e => {
         if (e.key === 'Enter' && msgInput.value.trim() && csInput.value.trim()) {
             chatRef.push({
@@ -106,7 +118,6 @@
         }
     });
 
-    // Scrub function
     function executePurge() {
         if (prompt("ENTER PURGE AUTHORIZATION:") === "purge123") {
             chatRef.remove()
