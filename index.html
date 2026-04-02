@@ -2,159 +2,122 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Krosynd // Shadow-Chat V5</title>
-    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Krosynd // Shadow-Chat V6</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gun/0.2020.1235/gun.min.js"></script>
     <style>
-        :root { --neon-blue: #00f2ff; --stark-black: #0a0a0a; --gray: #151515; --hazard: #ff3333; }
+        :root { --neon-blue: #00f2ff; --black: #050505; --gray: #121212; --hazard: #ff4444; }
         
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         
         body, html { 
-            background: var(--stark-black); 
-            color: var(--neon-blue); 
-            font-family: 'Consolas', monospace; 
-            margin: 0; 
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden; /* Prevent body scroll */
+            background: var(--black); color: var(--neon-blue); 
+            font-family: 'Consolas', 'Courier New', monospace; 
+            margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
         }
 
-        /* The Main Viewport Wrapper */
-        #viewport-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
+        #viewport {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column;
         }
 
         #header { 
-            border-bottom: 1px solid var(--neon-blue); 
-            padding: 10px; 
-            font-size: 0.7rem; 
-            display: flex; 
-            justify-content: space-between; 
-            background: var(--stark-black);
-            z-index: 10;
+            height: 40px; border-bottom: 1px solid #222; padding: 0 15px; 
+            display: flex; justify-content: space-between; align-items: center; font-size: 0.65rem; background: var(--black);
         }
 
-        /* Bottom-Up Chat Box */
+        /* Fixed Chat Area */
         #chat-box { 
-            flex: 1;
-            overflow-y: auto; 
-            padding: 15px; 
-            display: flex; 
-            flex-direction: column-reverse; /* NEW: Messages start from bottom */
-            gap: 12px;
-            background: linear-gradient(to bottom, transparent 90%, rgba(0, 242, 255, 0.05));
+            flex: 1; overflow-y: auto; padding: 15px; 
+            display: flex; flex-direction: column-reverse; gap: 10px;
         }
 
-        .msg { 
-            font-size: 0.95rem; 
-            border-left: 2px solid var(--neon-blue); 
-            padding: 4px 12px; 
-            background: rgba(255,255,255,0.02);
-            width: fit-content;
-            max-width: 90%;
-        }
-
-        .callsign-tag { font-weight: bold; color: #555; font-size: 0.75em; display: block; margin-bottom: 2px; }
+        .msg { font-size: 0.9rem; border-left: 2px solid var(--neon-blue); padding: 5px 12px; background: rgba(255,255,255,0.03); max-width: 85%; }
+        .cs-tag { font-weight: bold; color: #666; font-size: 0.7rem; display: block; text-transform: uppercase; }
         
-        /* Floating Input Area */
+        /* Floating Input Area - Locked Dimensions */
         #input-area { 
-            background: var(--gray); 
-            display: flex; 
-            border-top: 1px solid #333;
-            width: 100%;
-            padding-bottom: env(safe-area-inset-bottom); /* iOS Notch support */
+            height: 60px; background: var(--gray); display: flex; border-top: 1px solid #333; width: 100%;
         }
         
         #callsign { 
-            width: 70px; 
-            border: none; 
-            border-right: 1px solid #333; 
-            background: #000; 
-            color: #fff; 
-            padding: 15px 5px; 
-            text-align: center; 
-            outline: none;
-            font-size: 0.7rem;
+            width: 70px; /* FIXED WIDTH */
+            border: none; border-right: 1px solid #333; background: #000; 
+            color: #fff; text-align: center; outline: none; font-size: 0.7rem;
         }
 
         #message { 
-            flex-grow: 1; 
-            background: none; 
-            border: none; 
-            color: var(--neon-blue); 
-            padding: 15px; 
-            outline: none;
-            font-size: 16px; /* Essential for mobile focus */
+            flex: 1; background: none; border: none; color: var(--neon-blue); 
+            padding: 0 15px; outline: none; font-size: 16px;
         }
 
-        #purge-btn { background: none; border: 1px solid var(--hazard); color: var(--hazard); padding: 4px; font-size: 0.6rem; }
+        #purge-btn { background: none; border: 1px solid var(--hazard); color: var(--hazard); padding: 2px 8px; font-size: 0.6rem; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div id="viewport-container">
+<div id="viewport">
     <div id="header">
-        <span>TJ-XINETIC // FLOATING_NODE_V5</span>
-        <button id="purge-btn" onclick="triggerPurge()">[ SCRUB ]</button>
+        <span>KROSYND // V6_STABLE</span>
+        <button id="purge-btn" onclick="hardPurge()">[ RESET ]</button>
     </div>
 
-    <div id="chat-box" id="chat-stream">
-        </div>
+    <div id="chat-box"></div>
 
     <div id="input-area">
-        <input type="text" id="callsign" placeholder="CS" maxlength="6">
-        <input type="text" id="message" placeholder="Awaiting Signal..." autocomplete="off">
+        <input type="text" id="callsign" placeholder="CS" maxlength="5">
+        <input type="text" id="message" placeholder="Input signal..." autocomplete="off">
     </div>
 </div>
 
 <script>
-    const gun = Gun([
+    // Using explicit relay peers for better cross-device handshaking
+    const peers = [
         'https://gun-manhattan.herokuapp.com/gun',
-        'https://peer.wall.org/gun'
-    ]);
-    
-    const sector = gun.get('krosynd_shadow_sector_01');
+        'https://peer.wall.org/gun',
+        'https://gunjs.herokuapp.com/gun'
+    ];
+    const gun = Gun({ peers: peers, localStorage: false }); // Disable local storage to ensure fresh sync
+
+    // Purge logic using a dynamic key. If purged, we change the room ID.
+    let roomKey = localStorage.getItem('krosynd_room_v6') || 'sector_alpha_01';
+    let sector = gun.get(roomKey);
+
     const chatBox = document.getElementById('chat-box');
     const msgInput = document.getElementById('message');
-    const callsignInput = document.getElementById('callsign');
-    const container = document.getElementById('viewport-container');
+    const csInput = document.getElementById('callsign');
+    const viewport = document.getElementById('viewport');
 
-    // TACTICAL MOBILE FIX: Visual Viewport Tracking
+    // Mobile Viewport Keyboard Correction
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
-            container.style.height = window.visualViewport.height + 'px';
-            container.style.top = window.visualViewport.offsetTop + 'px';
-            window.scrollTo(0, 0);
+            viewport.style.height = window.visualViewport.height + 'px';
+            viewport.style.top = window.visualViewport.offsetTop + 'px';
         });
     }
 
-    // Sync Logic
-    sector.map().on((data, id) => {
-        if (!data) { location.reload(); return; }
-        if (data.time > (Date.now() - 14400000)) {
-            if (!document.getElementById(id)) {
-                const div = document.createElement('div');
-                div.id = id;
-                div.className = 'msg';
-                div.innerHTML = `<span class="callsign-tag">${data.user}</span>${data.body}`;
-                // prepend because of column-reverse
-                chatBox.prepend(div); 
+    // Sync Handler
+    function startListen() {
+        sector.map().on((data, id) => {
+            if (!data || !data.user) return;
+            if (data.time > (Date.now() - 14400000)) { // 4 Hour Window
+                if (!document.getElementById(id)) {
+                    const div = document.createElement('div');
+                    div.id = id;
+                    div.className = 'msg';
+                    div.innerHTML = `<span class="cs-tag">${data.user}</span>${data.body}`;
+                    chatBox.prepend(div);
+                }
             }
-        }
-    });
+        });
+    }
+    startListen();
 
+    // Transmission Logic
     msgInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && msgInput.value && callsignInput.value) {
+        if (e.key === 'Enter' && msgInput.value && csInput.value) {
             sector.set({
-                user: callsignInput.value,
+                user: csInput.value.toUpperCase(),
                 body: msgInput.value,
                 time: Date.now()
             });
@@ -162,9 +125,21 @@
         }
     });
 
-    function triggerPurge() {
-        if (prompt("CONFIRM PURGE:") === "purge123") sector.put(null);
+    // Hard Purge: Generates a new unique room key and reloads
+    function hardPurge() {
+        if (prompt("ENTER PURGE CODE:") === "purge123") {
+            const newKey = 'sector_' + Math.random().toString(36).substr(2, 9);
+            // Inform others on the current channel to switch or clear
+            sector.put({purged: true, time: Date.now()}); 
+            localStorage.setItem('krosynd_room_v6', newKey);
+            alert("SECTOR ZEROED. REBOOTING...");
+            location.reload();
+        }
     }
+
+    // Watch for purge signal from other devices
+    sector.get('purged').on(v => { if(v) location.reload(); });
+
 </script>
 </body>
 </html>
